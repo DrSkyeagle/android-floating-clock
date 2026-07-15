@@ -165,10 +165,10 @@ class FloatingService : Service() {
 
     private fun centerWindow() {
         val dm = resources.displayMetrics
-        // Use post to ensure view dimensions are available
-        container.post {
-            val w = if (container.width > 0) container.width else container.measuredWidth
-            val h = if (container.height > 0) container.height else container.measuredHeight
+        val handler = Handler(Looper.getMainLooper())
+        handler.post {
+            val w = container.width
+            val h = container.height
             if (w > 0 && h > 0) {
                 params!!.x = (dm.widthPixels - w) / 2
                 params!!.y = (dm.heightPixels - h) / 2
