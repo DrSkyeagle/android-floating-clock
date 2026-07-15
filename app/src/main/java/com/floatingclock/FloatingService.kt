@@ -162,7 +162,7 @@ class FloatingService : Service() {
         }
 
         val diffSec = ((target.timeInMillis - now.timeInMillis) / 1000).coerceAtLeast(0).toInt()
-        if (autoCenter && lastRemaining in 1..2 && diffSec > 250) {
+        if (autoCenter && lastRemaining <= 2 && diffSec > 250) {
             centerWindow()
         }
         lastRemaining = diffSec
