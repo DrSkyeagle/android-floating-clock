@@ -22,6 +22,7 @@ class FloatingService : Service() {
     private var downX = 0; private var downY = 0
     private var downRawX = 0f; private var downRawY = 0f
     private var isHovering = false
+    private var lastRemaining = 999
 
     override fun onCreate() {
         super.onCreate()
