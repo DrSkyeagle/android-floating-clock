@@ -45,7 +45,8 @@ class FloatingService : Service() {
         timeText = TextView(this).apply {
             text = "00:00:00"
             textSize = 28f
-            setTextColor(0xFF000000.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
+            setShadowLayer(5f, 0f, 0f, 0xCC000000.toInt())
             typeface = android.graphics.Typeface.MONOSPACE
         }
         container.addView(timeText)
@@ -53,7 +54,8 @@ class FloatingService : Service() {
         cdText = TextView(this).apply {
             text = "00:05:00"
             textSize = 16f
-            setTextColor(0xFF444444.toInt())
+            setTextColor(0xFFDDDDDD.toInt())
+            setShadowLayer(4f, 0f, 0f, 0xCC000000.toInt())
             typeface = android.graphics.Typeface.MONOSPACE
         }
         container.addView(cdText)
