@@ -1,6 +1,7 @@
 package com.floatingclock
 
 import android.app.*
+import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
@@ -22,8 +23,8 @@ class FloatingService : Service() {
     private var downX = 0; private var downY = 0
     private var downRawX = 0f; private var downRawY = 0f
     private var isHovering = false
-    private var autoCenter = false      // 倒计时结束自动居中
-    private var lastCd = 999             // 上一次倒计时秒数
+    private var autoCenter = true
+    private var lastCd = 999
 
     override fun onCreate() {
         super.onCreate()
@@ -37,11 +38,10 @@ class FloatingService : Service() {
     }
 
     private fun buildFloatingView() {
-        // Programmatic layout — no XML needed
         container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 16, 24, 16)
-            setBackgroundColor(0x00000000.toInt()) // fully transparent bg
+            setBackgroundColor(0x00000000.toInt())
         }
 
         timeText = TextView(this).apply {
@@ -62,7 +62,6 @@ class FloatingService : Service() {
         }
         container.addView(cdText)
 
-        // Window params
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         } else {
@@ -83,7 +82,6 @@ class FloatingService : Service() {
             y = 300
         }
 
-        // Touch: drag + hover detection
         container.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -117,8 +115,8 @@ class FloatingService : Service() {
         if (isHovering == on) return
         isHovering = on
         container.setBackgroundColor(
-            if (on) 0x80E8E8E8.toInt()  // 50% light gray
-            else 0x00000000.toInt()      // transparent
+            if (on) 0x80E8E8E8.toInt()
+            else 0x00000000.toInt()
         )
     }
 
@@ -138,13 +136,10 @@ class FloatingService : Service() {
         val h = now.get(Calendar.HOUR_OF_DAY)
         val m = now.get(Calendar.MINUTE)
         val s = now.get(Calendar.SECOND)
-
         timeText.text = String.format("%02d:%02d:%02d", h, m, s)
 
-        // Countdown to next 0/5 minute boundary
         val totalMin = h * 60 + m
         val delta = if (totalMin % 5 == 0) 5 else 5 - (totalMin % 5)
-
         val target = Calendar.getInstance().apply {
             add(Calendar.MINUTE, delta)
             set(Calendar.SECOND, 0)
@@ -152,8 +147,7 @@ class FloatingService : Service() {
         }
 
         val diffSec = ((target.timeInMillis - now.timeInMillis) / 1000).coerceAtLeast(0)
-        // 检测倒计时重置（从上一次 ≤2s 跳到 >250s）→ 自动居中
-        if (autoCenter && lastCd <= 2 && diffSec > 250) {
+        if (autoCenter && lastCd in 1..2 && diffSec > 250) {
             centerWindow()
         }
         lastCd = diffSec
@@ -165,15 +159,12 @@ class FloatingService : Service() {
 
     private fun centerWindow() {
         val dm = resources.displayMetrics
-        val handler = Handler(Looper.getMainLooper())
-        handler.post {
-            val w = container.width
-            val h = container.height
-            if (w > 0 && h > 0) {
-                params!!.x = (dm.widthPixels - w) / 2
-                params!!.y = (dm.heightPixels - h) / 2
-                windowManager.updateViewLayout(container, params)
-            }
+        val w = container.width
+        val h = container.height
+        if (w > 0 && h > 0) {
+            params!!.x = (dm.widthPixels - w) / 2
+            params!!.y = (dm.heightPixels - h) / 2
+            windowManager.updateViewLayout(container, params)
         }
     }
 
@@ -186,8 +177,8 @@ class FloatingService : Service() {
                 description = "悬浮钟后台运行"
                 setShowBadge(false)
             }
-            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
-                .createNotificationChannel(channel)
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(channel)
         }
     }
 
@@ -197,19 +188,12 @@ class FloatingService : Service() {
             Intent(this, FloatingService::class.java).apply { action = "STOP" },
             PendingIntent.FLAG_IMMUTABLE
         )
-        val toggleIntent = PendingIntent.getService(
-            this, 1,
-            Intent(this, FloatingService::class.java).apply { action = "TOGGLE_CENTER" },
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val label = if (autoCenter) "自动居中: 开" else "自动居中: 关"
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, "fc")
                 .setContentTitle("悬浮钟运行中")
                 .setContentText("点此关闭")
                 .setSmallIcon(android.R.drawable.ic_menu_recent_history)
                 .setContentIntent(stopIntent)
-                .addAction(android.R.drawable.ic_menu_compass, label, toggleIntent)
                 .setOngoing(true)
                 .build()
         } else {
@@ -219,24 +203,15 @@ class FloatingService : Service() {
                 .setContentText("点此关闭")
                 .setSmallIcon(android.R.drawable.ic_menu_recent_history)
                 .setContentIntent(stopIntent)
-                .addAction(android.R.drawable.ic_menu_compass, label, toggleIntent)
                 .setOngoing(true)
                 .build()
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            "STOP" -> {
-                stopSelf()
-                return START_NOT_STICKY
-            }
-            "TOGGLE_CENTER" -> {
-                autoCenter = !autoCenter
-                // Rebuild notification with updated label
-                val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-                nm.notify(1, buildNotification())
-            }
+        if (intent?.action == "STOP") {
+            stopSelf()
+            return START_NOT_STICKY
         }
         return START_STICKY
     }
