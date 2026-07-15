@@ -22,7 +22,9 @@ class FloatingService : Service() {
     private var downX = 0; private var downY = 0
     private var downRawX = 0f; private var downRawY = 0f
     private var isHovering = false
+    private var autoCenter = true          // 双击切换
     private var lastRemaining = 999
+    private var lastClickTime = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -82,7 +84,7 @@ class FloatingService : Service() {
             y = 300
         }
 
-        // Touch: drag + hover detection
+        // Touch: drag + hover + double-tap toggle
         container.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -91,6 +93,14 @@ class FloatingService : Service() {
                     downRawX = event.rawX
                     downRawY = event.rawY
                     setHover(true)
+                    // Double-tap detection
+                    val now = System.currentTimeMillis()
+                    if (now - lastClickTime < 400) {
+                        lastClickTime = 0
+                        toggleAutoCenter()
+                        return@setOnTouchListener true
+                    }
+                    lastClickTime = now
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -100,6 +110,7 @@ class FloatingService : Service() {
                         params!!.x = downX + dx.toInt()
                         params!!.y = downY + dy.toInt()
                         windowManager.updateViewLayout(container, params)
+                        lastClickTime = 0  // cancel double-tap if dragged
                     }
                     true
                 }
@@ -151,7 +162,7 @@ class FloatingService : Service() {
         }
 
         val diffSec = ((target.timeInMillis - now.timeInMillis) / 1000).coerceAtLeast(0).toInt()
-        if (lastRemaining in 1..2 && diffSec > 250) {
+        if (autoCenter && lastRemaining in 1..2 && diffSec > 250) {
             centerWindow()
         }
         lastRemaining = diffSec
@@ -170,6 +181,16 @@ class FloatingService : Service() {
             params!!.y = (dm.heightPixels - h) / 2
             windowManager.updateViewLayout(container, params)
         }
+    }
+
+    private fun toggleAutoCenter() {
+        autoCenter = !autoCenter
+        // Brief visual feedback: flash background green/red
+        val color = if (autoCenter) 0x8066BB6A.toInt() else 0x80EF5350.toInt()
+        container.setBackgroundColor(color)
+        Handler(Looper.getMainLooper()).postDelayed({
+            container.setBackgroundColor(0x00000000.toInt())
+        }, 600)
     }
 
     private fun createNotificationChannel() {
