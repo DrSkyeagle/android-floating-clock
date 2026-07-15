@@ -1,7 +1,6 @@
 package com.floatingclock
 
 import android.app.*
-import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
@@ -23,8 +22,8 @@ class FloatingService : Service() {
     private var downX = 0; private var downY = 0
     private var downRawX = 0f; private var downRawY = 0f
     private var isHovering = false
-    private var autoCenter = false
-    private var lastCd = 999
+    private var needCenter = false
+    private var lastRemaining = 999
 
     override fun onCreate() {
         super.onCreate()
@@ -38,10 +37,11 @@ class FloatingService : Service() {
     }
 
     private fun buildFloatingView() {
+        // Programmatic layout — no XML needed
         container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 16, 24, 16)
-            setBackgroundColor(0x00000000.toInt())
+            setBackgroundColor(0x00000000.toInt()) // fully transparent bg
         }
 
         timeText = TextView(this).apply {
@@ -62,6 +62,7 @@ class FloatingService : Service() {
         }
         container.addView(cdText)
 
+        // Window params
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         } else {
@@ -82,6 +83,7 @@ class FloatingService : Service() {
             y = 300
         }
 
+        // Touch: drag + hover detection
         container.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -115,8 +117,8 @@ class FloatingService : Service() {
         if (isHovering == on) return
         isHovering = on
         container.setBackgroundColor(
-            if (on) 0x80E8E8E8.toInt()
-            else 0x00000000.toInt()
+            if (on) 0x80E8E8E8.toInt()  // 50% light gray
+            else 0x00000000.toInt()      // transparent
         )
     }
 
@@ -136,10 +138,13 @@ class FloatingService : Service() {
         val h = now.get(Calendar.HOUR_OF_DAY)
         val m = now.get(Calendar.MINUTE)
         val s = now.get(Calendar.SECOND)
+
         timeText.text = String.format("%02d:%02d:%02d", h, m, s)
 
+        // Countdown to next 0/5 minute boundary
         val totalMin = h * 60 + m
         val delta = if (totalMin % 5 == 0) 5 else 5 - (totalMin % 5)
+
         val target = Calendar.getInstance().apply {
             add(Calendar.MINUTE, delta)
             set(Calendar.SECOND, 0)
@@ -147,25 +152,26 @@ class FloatingService : Service() {
         }
 
         val diffSec = ((target.timeInMillis - now.timeInMillis) / 1000).coerceAtLeast(0)
-        if (autoCenter && lastCd in 1..2 && diffSec > 250) {
-            centerWindow()
+        if (lastRemaining in 1..2 && diffSec > 250) {
+            needCenter = true
         }
-        lastCd = diffSec
+        lastRemaining = diffSec
+        // Center after countdown reset (on next tick)
+        if (needCenter) {
+            needCenter = false
+            centerOnScreen()
+        }
         val cdH = diffSec / 3600
         val cdM = (diffSec % 3600) / 60
         val cdS = diffSec % 60
         cdText.text = String.format("%02d:%02d:%02d", cdH, cdM, cdS)
     }
 
-    private fun centerWindow() {
-        val dm = resources.displayMetrics
-        val w = container.width
-        val h = container.height
-        if (w > 0 && h > 0) {
-            params!!.x = (dm.widthPixels - w) / 2
-            params!!.y = (dm.heightPixels - h) / 2
-            windowManager.updateViewLayout(container, params)
-        }
+    private fun centerOnScreen() {
+        val metrics = resources.displayMetrics
+        params!!.x = (metrics.widthPixels - container.width) / 2
+        params!!.y = (metrics.heightPixels - container.height) / 2
+        windowManager.updateViewLayout(container, params)
     }
 
     private fun createNotificationChannel() {
@@ -177,8 +183,8 @@ class FloatingService : Service() {
                 description = "悬浮钟后台运行"
                 setShowBadge(false)
             }
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.createNotificationChannel(channel)
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
+                .createNotificationChannel(channel)
         }
     }
 
@@ -225,3 +231,4 @@ class FloatingService : Service() {
         }
     }
 }
+
