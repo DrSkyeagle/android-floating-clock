@@ -150,12 +150,26 @@ class FloatingService : Service() {
             set(Calendar.MILLISECOND, 0)
         }
 
-        val diffSec = ((target.timeInMillis - now.timeInMillis) / 1000).coerceAtLeast(0)
+        val diffSec = ((target.timeInMillis - now.timeInMillis) / 1000).coerceAtLeast(0).toInt()
+        if (lastRemaining in 1..2 && diffSec > 250) {
+            centerWindow()
+        }
         lastRemaining = diffSec
         val cdH = diffSec / 3600
         val cdM = (diffSec % 3600) / 60
         val cdS = diffSec % 60
         cdText.text = String.format("%02d:%02d:%02d", cdH, cdM, cdS)
+    }
+
+    private fun centerWindow() {
+        val dm = resources.displayMetrics
+        val w = container.width
+        val h = container.height
+        if (w > 0 && h > 0) {
+            params!!.x = (dm.widthPixels - w) / 2
+            params!!.y = (dm.heightPixels - h) / 2
+            windowManager.updateViewLayout(container, params)
+        }
     }
 
     private fun createNotificationChannel() {
