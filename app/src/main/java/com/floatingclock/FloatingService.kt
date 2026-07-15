@@ -151,6 +151,7 @@ class FloatingService : Service() {
         }
 
         val diffSec = ((target.timeInMillis - now.timeInMillis) / 1000).coerceAtLeast(0)
+        lastRemaining = diffSec
         val cdH = diffSec / 3600
         val cdM = (diffSec % 3600) / 60
         val cdS = diffSec % 60
