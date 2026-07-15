@@ -22,8 +22,6 @@ class FloatingService : Service() {
     private var downX = 0; private var downY = 0
     private var downRawX = 0f; private var downRawY = 0f
     private var isHovering = false
-    private var needCenter = false
-    private var lastRemaining = 999
 
     override fun onCreate() {
         super.onCreate()
@@ -152,26 +150,10 @@ class FloatingService : Service() {
         }
 
         val diffSec = ((target.timeInMillis - now.timeInMillis) / 1000).coerceAtLeast(0)
-        if (lastRemaining in 1..2 && diffSec > 250) {
-            needCenter = true
-        }
-        lastRemaining = diffSec
-        // Center after countdown reset (on next tick)
-        if (needCenter) {
-            needCenter = false
-            centerOnScreen()
-        }
         val cdH = diffSec / 3600
         val cdM = (diffSec % 3600) / 60
         val cdS = diffSec % 60
         cdText.text = String.format("%02d:%02d:%02d", cdH, cdM, cdS)
-    }
-
-    private fun centerOnScreen() {
-        val metrics = resources.displayMetrics
-        params!!.x = (metrics.widthPixels - container.width) / 2
-        params!!.y = (metrics.heightPixels - container.height) / 2
-        windowManager.updateViewLayout(container, params)
     }
 
     private fun createNotificationChannel() {
