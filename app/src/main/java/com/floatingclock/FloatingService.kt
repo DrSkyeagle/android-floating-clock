@@ -22,6 +22,8 @@ class FloatingService : Service() {
     private var downX = 0; private var downY = 0
     private var downRawX = 0f; private var downRawY = 0f
     private var isHovering = false
+    private var autoCenter = false      // 倒计时结束自动居中
+    private var lastCd = 999             // 上一次倒计时秒数
 
     override fun onCreate() {
         super.onCreate()
@@ -150,10 +152,28 @@ class FloatingService : Service() {
         }
 
         val diffSec = ((target.timeInMillis - now.timeInMillis) / 1000).coerceAtLeast(0)
+        // 检测倒计时重置（从上一次 ≤2s 跳到 >250s）→ 自动居中
+        if (autoCenter && lastCd <= 2 && diffSec > 250) {
+            centerWindow()
+        }
+        lastCd = diffSec
         val cdH = diffSec / 3600
         val cdM = (diffSec % 3600) / 60
         val cdS = diffSec % 60
         cdText.text = String.format("%02d:%02d:%02d", cdH, cdM, cdS)
+    }
+
+    private fun centerWindow() {
+        val dm = resources.displayMetrics
+        container.measure(
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        val w = container.measuredWidth
+        val h = container.measuredHeight
+        params!!.x = (dm.widthPixels - w) / 2
+        params!!.y = (dm.heightPixels - h) / 2
+        windowManager.updateViewLayout(container, params)
     }
 
     private fun createNotificationChannel() {
@@ -176,12 +196,19 @@ class FloatingService : Service() {
             Intent(this, FloatingService::class.java).apply { action = "STOP" },
             PendingIntent.FLAG_IMMUTABLE
         )
+        val toggleIntent = PendingIntent.getService(
+            this, 1,
+            Intent(this, FloatingService::class.java).apply { action = "TOGGLE_CENTER" },
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        val label = if (autoCenter) "自动居中: 开" else "自动居中: 关"
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, "fc")
                 .setContentTitle("悬浮钟运行中")
                 .setContentText("点此关闭")
                 .setSmallIcon(android.R.drawable.ic_menu_recent_history)
                 .setContentIntent(stopIntent)
+                .addAction(android.R.drawable.ic_menu_compass, label, toggleIntent)
                 .setOngoing(true)
                 .build()
         } else {
@@ -191,15 +218,24 @@ class FloatingService : Service() {
                 .setContentText("点此关闭")
                 .setSmallIcon(android.R.drawable.ic_menu_recent_history)
                 .setContentIntent(stopIntent)
+                .addAction(android.R.drawable.ic_menu_compass, label, toggleIntent)
                 .setOngoing(true)
                 .build()
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == "STOP") {
-            stopSelf()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            "STOP" -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            "TOGGLE_CENTER" -> {
+                autoCenter = !autoCenter
+                // Rebuild notification with updated label
+                val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                nm.notify(1, buildNotification())
+            }
         }
         return START_STICKY
     }
