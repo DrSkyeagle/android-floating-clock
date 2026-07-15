@@ -165,15 +165,16 @@ class FloatingService : Service() {
 
     private fun centerWindow() {
         val dm = resources.displayMetrics
-        container.measure(
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-        )
-        val w = container.measuredWidth
-        val h = container.measuredHeight
-        params!!.x = (dm.widthPixels - w) / 2
-        params!!.y = (dm.heightPixels - h) / 2
-        windowManager.updateViewLayout(container, params)
+        // Use post to ensure view dimensions are available
+        container.post {
+            val w = if (container.width > 0) container.width else container.measuredWidth
+            val h = if (container.height > 0) container.height else container.measuredHeight
+            if (w > 0 && h > 0) {
+                params!!.x = (dm.widthPixels - w) / 2
+                params!!.y = (dm.heightPixels - h) / 2
+                windowManager.updateViewLayout(container, params)
+            }
+        }
     }
 
     private fun createNotificationChannel() {
